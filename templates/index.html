@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eleview Purple</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Inter', sans-serif; }
+body, html { width:100%; height:100%; overflow-x:hidden; background:#1b0b2a; }
+
+header {
+    text-align:center;
+    padding:20px;
+    font-size:24px;
+    font-weight:600;
+    color:white;
+    text-shadow:0 2px 5px rgba(0,0,0,0.5);
+}
+
+/* 파티클 배경 */
+#particles {
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100%;
+    z-index:-1;
+    pointer-events:none;
+    background:#1b0b2a;
+}
+
+/* 컨테이너 */
+.container {
+    max-width:400px;
+    margin:0 auto;
+    padding:15px;
+}
+
+/* 검색창 글래스모피즘 */
+.search-box {
+    display:flex;
+    margin-bottom:20px;
+    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.05);
+    border-radius:15px;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding:5px;
+}
+#modelInput {
+    flex:1;
+    padding:12px;
+    border:none;
+    border-radius:15px 0 0 15px;
+    outline:none;
+    color:white;
+    background:transparent;
+}
+#modelInput::placeholder { color:rgba(255,255,255,0.6); }
+#searchBtn {
+    padding:12px 20px;
+    border:none;
+    border-radius:0 15px 15px 0;
+    background:rgba(138,43,226,0.8); /* 보라색 */
+    color:white;
+    font-weight:600;
+    cursor:pointer;
+    transition:0.2s;
+}
+#searchBtn:hover { background:rgba(138,43,226,1); }
+
+/* 결과 카드 글래스모피즘 */
+#results {
+    display:flex;
+    flex-direction:column;
+    gap:15px;
+}
+.card {
+    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.05);
+    border-radius:15px;
+    padding:15px;
+    border:1px solid rgba(255,255,255,0.1);
+    color:white;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+}
+.card:hover { transform: translateY(-3px); }
+.card p { margin:5px 0; }
+.card p strong { color:#da70d6; } /* 연보라 강조 */
+</style>
+</head>
+<body>
+
+<div id="particles"></div>
+
+<header>Eleview Purple</header>
+
+<div class="container">
+    <div class="search-box">
+        <input type="text" id="modelInput" placeholder="모델명을 입력하세요">
+        <button id="searchBtn">검색</button>
+    </div>
+    <div id="results"></div>
+</div>
+
+<script>
+// ----------------- 파티클 -----------------
+const canvas = document.createElement('canvas');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+document.getElementById('particles').appendChild(canvas);
+const ctx = canvas.getContext('2d');
+
+let particlesArray = [];
+const colors = ['rgba(138,43,226,0.2)','rgba(221,160,221,0.2)','rgba(147,112,219,0.2)'];
+class Particle {
+    constructor(){
+        this.x = Math.random()*canvas.width;
+        this.y = Math.random()*canvas.height;
+        this.size = Math.random()*3+1;
+        this.speedX = Math.random()*1-0.5;
+        this.speedY = Math.random()*1-0.5;
+        this.color = colors[Math.floor(Math.random()*colors.length)];
+    }
+    update(){
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if(this.x<0||this.x>canvas.width) this.speedX*=-1;
+        if(this.y<0||this.y>canvas.height) this.speedY*=-1;
+    }
+    draw(){
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+        ctx.fill();
+    }
+}
+
+function initParticles(){
+    particlesArray=[];
+    for(let i=0;i<80;i++){
+        particlesArray.push(new Particle());
+    }
+}
+function animateParticles(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particlesArray.forEach(p=>{
+        p.update();
+        p.draw();
+    });
+    requestAnimationFrame(animateParticles);
+}
+initParticles();
+animateParticles();
+window.addEventListener('resize',()=>{
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    initParticles();
+});
+
+// ----------------- 검색 기능 -----------------
+const input = document.getElementById('modelInput');
+const resultsDiv = document.getElementById('results');
+const searchBtn = document.getElementById('searchBtn');
+
+function clean(str){
+    if(!str) return '';
+    return str.replace(/[\u200B-\u200D\uFEFF]/g,'').trim();
+}
+
+function search() {
+    const val = clean(input.value);
+    if(!val) return;
+
+    fetch(`/search?model=${encodeURIComponent(val)}`)
+        .then(res=>res.json())
+        .then(data=>{
+            resultsDiv.innerHTML = '';
+            if(data.length===0){
+                resultsDiv.innerHTML=`<p>모델명을 찾을 수 없습니다.</p>`;
+                return;
+            }
+            data.forEach(row=>{
+                const card = document.createElement('div');
+                card.className='card';
+                card.innerHTML=`
+                    <p><strong>모델명:</strong> ${clean(row[row.length-2])}</p>
+                    <p><strong>제조사:</strong> ${clean(row[16]||'정보 없음')}</p>
+                    <p><strong>주소:</strong> ${clean(row[1]||'정보 없음')}</p>
+                    <p><strong>운행상태:</strong> ${clean(row[row.length-4]||'정보 없음')}</p>
+                `;
+                resultsDiv.appendChild(card);
+            });
+        })
+        .catch(err=>{
+            resultsDiv.innerHTML=`<p>검색 중 오류가 발생했습니다.</p>`;
+            console.error(err);
+        });
+}
+
+searchBtn.addEventListener('click',search);
+input.addEventListener('keydown',e=>{
+    if(e.key==='Enter') search();
+});
+</script>
+
+</body>
+</html>
